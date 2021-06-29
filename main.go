@@ -18,6 +18,10 @@ var tokenPath string
 var phone string
 
 func main() {
+	run()
+}
+
+func run()  {
 	if len(os.Args) < 2 {
 		fmt.Printf("请输入手机号: ")
 		fmt.Scanln(&phone)
@@ -30,17 +34,11 @@ func main() {
 	// 首次运行检测登录
 	if err := checkLogin(); err != nil {
 		log.Println(err.Error())
-		if err2 := doLogin(); err2 != nil {
-			log.Fatalln(err2.Error())
-		}
-
-		if checkLogin() != nil {
-			log.Fatalln("登录失败")
-		}
+		doLogin()
 	}
 
 	nbdz2021Status()
-	t := time.NewTicker(60 * time.Second)
+	t := time.NewTicker(10 * time.Second)
 	defer t.Stop()
 
 	for {
@@ -70,13 +68,10 @@ func checkLogin() error {
 
 func doLogin() error {
 	// 发送短信
-	getSmsCode()
+	//getSmsCode()
 	fmt.Printf("验证码已发送到 " + phone + ", 请输入验证码登录: ")
 	var code string
-	n, err := fmt.Scanf("%f\n", &code)
-	if err != nil || n != 1 {
-		log.Fatalln(n, err)
-	}
+	fmt.Scanln(&code)
 
 	request := gorequest.New()
 	resp, _, _ := request.Post("https://web-api.okjike.com/api/graphql").
@@ -116,7 +111,7 @@ func nbdz2021Status() {
 	}
 
 	request := gorequest.New()
-	_, body, _ := request.Get("https://api.ruguoapp.com/1.0/nbdz2021/status").
+	resp, body, _ := request.Get("https://api.ruguoapp.com/1.0/nbdz2021/status").
 		Set("x-jike-access-token", getAccessToken()).
 		End()
 	selfCamp := gjson.Get(body, "selfCamp").String()
@@ -130,7 +125,7 @@ func nbdz2021Status() {
 		"待收割: ", camp["watered"].String(),
 	}
 
-	fmt.Printf(strings.Join(s, ""))
+	fmt.Printf(strings.Join(s, "") + resp.Status)
 	// 默认收割
 	act := "REAP"
 	actEnergy := uint64(3)
@@ -150,6 +145,9 @@ func nbdz2021Status() {
 	//// 固定施肥
 	//act = "WATER"
 	//actEnergy = 2
+	//// 固定插秧
+	//act = "PLANT"
+	//actEnergy = 1
 
 	count := selfInfo["energy"].Uint() / actEnergy
 
@@ -183,13 +181,15 @@ func nbdz2021Status() {
 
 func nbdz2021Act(act string, count uint64) {
 	request := gorequest.New()
-	_, _, _ = request.Post("https://api.ruguoapp.com/1.0/nbdz2021/act").
+	resp, _, _ := request.Post("https://api.ruguoapp.com/1.0/nbdz2021/act").
 		Set("x-jike-access-token", getAccessToken()).
 		// 收割 REAP
 		// 播种 PLANT
 		// 施肥 WATER
 		Send(`{"count": ` + strconv.FormatUint(count, 10) + `,"action": "` + act + `"}`).
 		End()
+
+	log.Printf(resp.Status)
 }
 
 func refreshToken() error {
